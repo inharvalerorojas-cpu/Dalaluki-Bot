@@ -2,32 +2,31 @@ import discord
 from discord.ext import commands
 import os, threading, asyncio, random
 from flask import Flask, request, render_template_string, redirect
-from datetime import datetime, timedelta
+from datetime import timedelta
 from collections import defaultdict
 
 app = Flask('')
 TOKEN = os.getenv("TOKEN")
-PASSWORD = "dalaluki"
+PASSWORD = "dalaluki_1234"
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 MSG_COUNT = 0
-USERS = defaultdict(int)
 
 HTML = """
 <style>
-body{background:#111;color:white;font-family:Arial;padding:15px;max-width:800px;margin:auto}
+body{background:#111;color:white;font-family:Arial;padding:15px;max-width:900px;margin:auto}
 .card{background:#222;padding:16px;border-radius:12px;margin-bottom:15px;border:1px solid #333}
 input,select,textarea{width:100%;padding:12px;margin:6px 0;background:#333;color:white;border:none;border-radius:8px;box-sizing:border-box}
 button{background:#5865F2;color:white;padding:12px;width:100%;border:none;border-radius:8px;cursor:pointer;font-weight:bold;margin-top:6px}
-button.red{background:#ef4444} button.yellow{background:#eab308;color:black} button.green{background:#22c55e}
+button.red{background:#ef4444} button.yellow{background:#eab308;color:black} button.green{background:#22c55e} button.orange{background:#f97316}
 h3{margin:0 0 10px 0;color:#a78bfa}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:600px){.grid{grid-template-columns:1fr}}
 </style>
 
-<h1>🤖 Panel Dalaluki FINAL</h1>
+<h1>🤖 Panel Dalaluki FINAL + Tickets</h1>
 <div class="card"><h3>📈 {{total}} miembros | {{msg}} msgs hoy</h3></div>
 
 <div class="grid">
@@ -49,18 +48,21 @@ h3{margin:0 0 10px 0;color:#a78bfa}
 <form action="/giveaway?pwd={{pwd}}" method="post">
 <select name="channel_id">{% for g in bot.guilds %}{% for c in g.text_channels %}<option value="{{c.id}}">#{{c.name}}</option>{% endfor %}{% endfor %}</select>
 <input name="prize" placeholder="Premio: Nitro">
-<input name="minutes" type="number" value="5" placeholder="Minutos">
-<button class="yellow">Iniciar Sorteo</button></form></div>
+<input name="minutes" type="number" value="5"><button class="yellow">Iniciar</button></form></div>
 
 <div class="card"><h3>📊 Encuesta</h3>
 <form action="/poll?pwd={{pwd}}" method="post">
 <select name="channel_id">{% for g in bot.guilds %}{% for c in g.text_channels %}<option value="{{c.id}}">#{{c.name}}</option>{% endfor %}{% endfor %}</select>
-<input name="q" placeholder="¿Qué jugamos?">
-<input name="o1" placeholder="Opción 1">
-<input name="o2" placeholder="Opción 2">
+<input name="q" placeholder="Pregunta"><input name="o1" placeholder="Opción 1"><input name="o2" placeholder="Opción 2">
 <button class="green">Crear Encuesta</button></form></div>
 </div>
-<p style="text-align:center;opacity:0.5">Panel protegido con dalaluki_1234</p>
+
+<div class="card"><h3>🎫 Sistema Tickets</h3>
+<form action="/ticketpanel?pwd={{pwd}}" method="post">
+<select name="channel_id">{% for g in bot.guilds %}{% for c in g.text_channels %}<option value="{{c.id}}">#{{c.name}} - DONDE PONER EL PANEL</option>{% endfor %}{% endfor %}</select>
+<button class="orange">Crear Panel de Tickets en ese canal</button>
+<p style="opacity:0.6;font-size:12px">Esto creará un mensaje con botón. Al clicar, se abre ticket privado.</p>
+</form></div>
 """
 
 @app.route('/')
@@ -98,13 +100,12 @@ def giveaway():
     if request.args.get('pwd')!= PASSWORD: return "No",401
     ch=bot.get_channel(int(request.form['channel_id'])); prize=request.form['prize']; mins=int(request.form['minutes'] or 5)
     async def do():
-        embed=discord.Embed(title="🎉 SORTEO", description=f"Premio: **{prize}**\nReacciona 🎉\nTermina en {mins} min", color=discord.Color.gold())
+        embed=discord.Embed(title="🎉 SORTEO", description=f"Premio: **{prize}**\nReacciona 🎉", color=discord.Color.gold())
         msg=await ch.send(embed=embed); await msg.add_reaction("🎉")
         await asyncio.sleep(mins*60)
         msg=await ch.fetch_message(msg.id)
         users=[u async for u in msg.reactions[0].users() if not u.bot]
-        if users: await ch.send(f"🎉 Ganador de **{prize}**: {random.choice(users).mention}!")
-        else: await ch.send("Nadie participó")
+        if users: await ch.send(f"Ganador **{prize}**: {random.choice(users).mention}!")
     asyncio.run_coroutine_threadsafe(do(), bot.loop)
     return redirect(f"/panel?pwd={PASSWORD}")
 
@@ -115,19 +116,61 @@ def poll():
     async def do():
         q=request.form['q']; o1=request.form['o1']; o2=request.form['o2']
         embed=discord.Embed(title=f"📊 {q}", description=f"1️⃣ {o1}\n2️⃣ {o2}", color=discord.Color.blurple())
-        msg=await ch.send(embed=embed)
-        await msg.add_reaction("1️⃣"); await msg.add_reaction("2️⃣")
+        msg=await ch.send(embed=embed); await msg.add_reaction("1️⃣"); await msg.add_reaction("2️⃣")
     asyncio.run_coroutine_threadsafe(do(), bot.loop)
     return redirect(f"/panel?pwd={PASSWORD}")
 
+@app.route('/ticketpanel', methods=['POST'])
+def ticketpanel():
+    if request.args.get('pwd')!= PASSWORD: return "No",401
+    ch=bot.get_channel(int(request.form['channel_id']))
+    async def do():
+        embed=discord.Embed(title="🎫 Soporte", description="Clica el botón para abrir un ticket privado con el staff.", color=discord.Color.green())
+        view = TicketView()
+        await ch.send(embed=embed, view=view)
+    asyncio.run_coroutine_threadsafe(do(), bot.loop)
+    return redirect(f"/panel?pwd={PASSWORD}")
+
+# --- SISTEMA TICKETS ---
+class TicketView(discord.ui.View):
+    def __init__(self): super().__init__(timeout=None)
+    @discord.ui.button(label="📩 Abrir Ticket", style=discord.ButtonStyle.green, custom_id="open_ticket")
+    async def open_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        guild = interaction.guild
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        }
+        # Busca rol staff si existe
+        for r in guild.roles:
+            if "staff" in r.name.lower() or "mod" in r.name.lower() or "admin" in r.name.lower():
+                overwrites[r] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        channel = await guild.create_text_channel(f"ticket-{interaction.user.name}", overwrites=overwrites)
+        embed=discord.Embed(title=f"Ticket de {interaction.user}", description="Staff te atenderá pronto. Clica 🔒 para cerrar.", color=discord.Color.orange())
+        await channel.send(f"{interaction.user.mention}", embed=embed, view=CloseView())
+        await interaction.response.send_message(f"Ticket creado: {channel.mention}", ephemeral=True)
+
+class CloseView(discord.ui.View):
+    def __init__(self): super().__init__(timeout=None)
+    @discord.ui.button(label="🔒 Cerrar Ticket", style=discord.ButtonStyle.red, custom_id="close_ticket")
+    async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Cerrando en 3 seg...")
+        await asyncio.sleep(3)
+        await interaction.channel.delete()
+
 @bot.event
-async def on_ready(): print(f"✅ FINAL ON {bot.user}")
+async def on_ready():
+    bot.add_view(TicketView())
+    bot.add_view(CloseView())
+    print(f"✅ ON {bot.user} con tickets")
+
 @bot.event
 async def on_message(m):
     global MSG_COUNT
     if not m.author.bot: MSG_COUNT+=1
     await bot.process_commands(m)
 
-def run_web(): app.run(host='0.0.0.0', port=8080)
-threading.Thread(target=run_web).start()
-bot.run(TOKEN)
+if __name__ == "__main__":
+    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))).start()
+    bot.run(TOKEN)
