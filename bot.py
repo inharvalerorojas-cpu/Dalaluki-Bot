@@ -62,7 +62,7 @@ button.red{background:#ef4444}button.yellow{background:#eab308;color:black}butto
 h3{margin:0 0 10px 0;color:#a78bfa}.logs{height:200px;overflow-y:auto;background:#000;padding:10px;border-radius:8px;font-family:monospace;font-size:11px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:600px){.grid{grid-template-columns:1fr}}
 </style>
-<h1>🤖 Dalaluki-Bot FINAL 24/7</h1>
+<h1>🤖 Dalaluki-Bot>
 <div class="card">
 <h3>Estado: {{'🟢 ONLINE' if bot.is_ready() else '🔴 OFFLINE'}} | <a href='/logs?pwd={{pwd}}' style='color:#22c55e'>Logs</a> | <a href='/keepalive' style='color:#0ea5e9'>KeepAlive OK</a></h3>
 <div class="logs">{{logs_html|safe}}</div>
