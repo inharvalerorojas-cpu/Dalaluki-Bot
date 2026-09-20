@@ -7,7 +7,7 @@ from collections import defaultdict
 
 app = Flask('')
 TOKEN = os.getenv("TOKEN")
-PASSWORD = "dalaluki_1234"
+PASSWORD = "dalaluki"
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
